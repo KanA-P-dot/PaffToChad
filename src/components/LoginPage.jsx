@@ -12,8 +12,14 @@ export default function LoginPage({ onLogin }) {
       .select('*')
       .order('name')
       .then(({ data, error }) => {
-        if (error) setError(error.message)
+        console.log('[PTC] data:', data, 'error:', error)
+        if (error) setError(error.message || JSON.stringify(error))
         else setUsers(data ?? [])
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('[PTC] fetch crash:', err)
+        setError('Crash: ' + err.message)
         setLoading(false)
       })
   }, [])
@@ -40,9 +46,16 @@ export default function LoginPage({ onLogin }) {
       )}
 
       {/* Erreur */}
-      {error && (
-        <p className="text-red-400 bg-red-950/50 border border-red-800 rounded-xl px-4 py-3 text-sm">
-          Erreur : {error}
+      {error !== null && (
+        <p className="text-red-400 bg-red-950/50 border border-red-800 rounded-xl px-4 py-3 text-sm break-all">
+          Erreur : {error || '(vide)'}
+        </p>
+      )}
+
+      {/* Aucun utilisateur trouvé */}
+      {!loading && error === null && users.length === 0 && (
+        <p className="text-yellow-400 bg-yellow-950/50 border border-yellow-800 rounded-xl px-4 py-3 text-sm">
+          Aucun utilisateur trouvé en base de données.
         </p>
       )}
 
