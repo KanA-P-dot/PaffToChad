@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { format, subDays, addDays, isToday, parseISO } from 'date-fns'
+import { format, subDays, addDays, isToday } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { supabase } from '../lib/supabase'
 import StatsModule from './StatsModule'
