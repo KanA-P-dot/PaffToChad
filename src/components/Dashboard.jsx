@@ -103,9 +103,12 @@ export default function Dashboard({ user, onLogout }) {
       <header className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/60 px-5 py-4">
         <div className="flex items-center justify-between max-w-md mx-auto">
           {/* Logo */}
-          <h1 className="text-xl font-black text-white tracking-tight">
+          <button
+            onClick={onLogout}
+            className="text-xl font-black text-white tracking-tight hover:opacity-70 transition-opacity"
+          >
             Paff<span className="text-chad-500">To</span>Chad
-          </h1>
+          </button>
 
           {/* Actions */}
           <div className="flex items-center gap-2">
