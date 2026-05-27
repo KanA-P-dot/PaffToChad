@@ -3,26 +3,30 @@ import { format, subDays, addDays, isToday, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { supabase } from '../lib/supabase'
 import StatsModule from './StatsModule'
+import ObjectifsEditor from './ObjectifsEditor'
 
 // ─── Utilitaire : formater une Date en YYYY-MM-DD ─────────────────────────────
 const toISO = (d) => format(d, 'yyyy-MM-dd')
 
 export default function Dashboard({ user, onLogout }) {
-  const [view, setView]           = useState('dashboard') // 'dashboard' | 'stats'
+  const [view, setView]           = useState('dashboard') // 'dashboard' | 'stats' | 'objectifs'
   const [currentDate, setCurrent] = useState(new Date())
   const [objectifs, setObjectifs] = useState([])
   const [logs, setLogs]           = useState({})        // { objectif_id: boolean }
   const [saving, setSaving]       = useState({})        // { objectif_id: true } en cours de save
   const [loadingLogs, setLoadingLogs] = useState(false)
 
-  // Charge les objectifs une seule fois
-  useEffect(() => {
-    supabase
+  // Charge les objectifs (rappelable après édition)
+  const loadObjectifs = useCallback(async () => {
+    const { data } = await supabase
       .from('objectifs')
       .select('*')
+      .eq('user_id', user.id)
       .order('order_index')
-      .then(({ data }) => { if (data) setObjectifs(data) })
-  }, [])
+    if (data) setObjectifs(data)
+  }, [user.id])
+
+  useEffect(() => { loadObjectifs() }, [loadObjectifs])
 
   // Charge les logs dès que la date ou l'user change
   const loadLogs = useCallback(async () => {
@@ -75,6 +79,16 @@ export default function Dashboard({ user, onLogout }) {
     return <StatsModule user={user} onBack={() => setView('dashboard')} />
   }
 
+  if (view === 'objectifs') {
+    return (
+      <ObjectifsEditor
+        user={user}
+        onBack={() => { setView('dashboard'); loadObjectifs() }}
+        onObjectifsChange={loadObjectifs}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
 
@@ -96,6 +110,15 @@ export default function Dashboard({ user, onLogout }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               Stats
+            </button>
+            <button
+              onClick={() => setView('objectifs')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white text-sm font-medium transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Objectifs
             </button>
             <button
               onClick={onLogout}
