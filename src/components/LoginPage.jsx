@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchStreak } from '../lib/streak'
 
 export default function LoginPage({ onLogin }) {
   const [users, setUsers]     = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
+  const [streaks, setStreaks]  = useState({}) // { userId: count }
 
   useEffect(() => {
     supabase
@@ -14,7 +16,13 @@ export default function LoginPage({ onLogin }) {
       .then(({ data, error }) => {
         console.log('[PTC] data:', data, 'error:', error)
         if (error) setError(error.message || JSON.stringify(error))
-        else setUsers(data ?? [])
+        else {
+          setUsers(data ?? [])
+          // Charge les streaks pour chaque utilisateur
+          data?.forEach(u => {
+            fetchStreak(u.id).then(s => setStreaks(prev => ({ ...prev, [u.id]: s })))
+          })
+        }
         setLoading(false)
       })
       .catch(err => {
@@ -67,6 +75,7 @@ export default function LoginPage({ onLogin }) {
               key={user.id}
               user={user}
               accent={i === 0 ? 'chad' : 'indigo'}
+              streak={streaks[user.id] ?? null}
               onLogin={onLogin}
             />
           ))}
@@ -78,7 +87,7 @@ export default function LoginPage({ onLogin }) {
   )
 }
 
-function ProfileCard({ user, accent, onLogin }) {
+function ProfileCard({ user, accent, streak, onLogin }) {
   const [pressing, setPressing] = useState(false)
 
   const border  = accent === 'chad'   ? 'border-chad-500/30 hover:border-chad-500'   : 'border-indigo-500/30 hover:border-indigo-500'
@@ -113,7 +122,12 @@ function ProfileCard({ user, accent, onLogin }) {
 
       {/* Infos */}
       <div className="flex-1 text-left">
-        <p className="text-white font-bold text-xl leading-tight">{user.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-white font-bold text-xl leading-tight">{user.name}</p>
+          {streak > 0 && (
+            <span className="text-orange-400 font-bold text-sm">🔥 {streak}</span>
+          )}
+        </div>
         <p className="text-slate-400 text-sm mt-0.5">{user.email}</p>
       </div>
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { format, subDays, addDays, isToday } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { supabase } from '../lib/supabase'
+import { fetchStreak } from '../lib/streak'
 import StatsModule from './StatsModule'
 import ObjectifsEditor from './ObjectifsEditor'
 
@@ -15,6 +16,7 @@ export default function Dashboard({ user, onLogout }) {
   const [logs, setLogs]           = useState({})        // { objectif_id: boolean }
   const [saving, setSaving]       = useState({})        // { objectif_id: true } en cours de save
   const [loadingLogs, setLoadingLogs] = useState(false)
+  const [streak, setStreak]       = useState(null)
 
   // Charge les objectifs (rappelable après édition)
   const loadObjectifs = useCallback(async () => {
@@ -45,6 +47,13 @@ export default function Dashboard({ user, onLogout }) {
 
   useEffect(() => { loadLogs() }, [loadLogs])
 
+  // Charge / rafraîchit le streak (recalcul si les logs d'aujourd'hui changent)
+  const completedCount = objectifs.filter(o => logs[o.id]).length
+  const totalCount     = objectifs.length
+  useEffect(() => {
+    fetchStreak(user.id).then(setStreak)
+  }, [user.id, isToday(currentDate) ? completedCount : null])  // eslint-disable-line react-hooks/exhaustive-deps
+
   // Toggle un objectif (upsert Supabase)
   const toggle = async (objectif_id) => {
     const newVal = !logs[objectif_id]
@@ -71,9 +80,7 @@ export default function Dashboard({ user, onLogout }) {
   const goForward = () => { if (!isToday(currentDate)) setCurrent(d => addDays(d, 1)) }
   const goToday   = () => setCurrent(new Date())
 
-  const completedCount = objectifs.filter(o => logs[o.id]).length
-  const totalCount     = objectifs.length
-  const progress       = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+  const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   if (view === 'stats') {
     return <StatsModule user={user} onBack={() => setView('dashboard')} />
@@ -145,7 +152,12 @@ export default function Dashboard({ user, onLogout }) {
             }
           </div>
           <div>
-            <p className="text-white font-semibold leading-tight">Salut, {user.name} 👊</p>
+            <p className="text-white font-semibold leading-tight">
+              Salut, {user.name} 👊
+              {streak > 0 && (
+                <span className="ml-2 text-orange-400 font-bold text-sm">🔥 {streak} jour{streak > 1 ? 's' : ''}</span>
+              )}
+            </p>
             <p className="text-slate-400 text-xs">
               {isToday(currentDate) ? "C'est l'heure de dominer aujourd'hui" : 'Rattrapage en cours…'}
             </p>
