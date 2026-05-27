@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchStreak } from '../lib/streak'
+import { fetchWeeklyScores } from '../lib/weeklyScore'
+import WeeklyScoreWidget from './WeeklyScoreWidget'
 
 export default function LoginPage({ onLogin }) {
-  const [users, setUsers]     = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(null)
-  const [streaks, setStreaks]  = useState({}) // { userId: count }
+  const [users, setUsers]           = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
+  const [streaks, setStreaks]        = useState({}) // { userId: count }
+  const [weeklyScores, setWeeklyScores] = useState({}) // { userId: { chad, paff } }
 
   useEffect(() => {
     supabase
@@ -18,9 +21,11 @@ export default function LoginPage({ onLogin }) {
         if (error) setError(error.message || JSON.stringify(error))
         else {
           setUsers(data ?? [])
-          // Charge les streaks pour chaque utilisateur
           data?.forEach(u => {
             fetchStreak(u.id).then(s => setStreaks(prev => ({ ...prev, [u.id]: s })))
+          })
+          fetchWeeklyScores().then(result => {
+            if (result) setWeeklyScores(result.scores)
           })
         }
         setLoading(false)
@@ -76,18 +81,26 @@ export default function LoginPage({ onLogin }) {
               user={user}
               accent={i === 0 ? 'chad' : 'indigo'}
               streak={streaks[user.id] ?? null}
+              weeklyScore={weeklyScores[user.id] ?? null}
               onLogin={onLogin}
             />
           ))}
         </div>
       )}
 
-      <p className="mt-10 text-slate-600 text-xs">v1.0 · Session locale</p>
+      {/* Score de la semaine */}
+      {!loading && !error && (
+        <div className="w-full max-w-sm mt-6">
+          <WeeklyScoreWidget />
+        </div>
+      )}
+
+      <p className="mt-4 text-slate-600 text-xs">v1.0 · Session locale</p>
     </div>
   )
 }
 
-function ProfileCard({ user, accent, streak, onLogin }) {
+function ProfileCard({ user, accent, streak, weeklyScore, onLogin }) {
   const [pressing, setPressing] = useState(false)
 
   const border  = accent === 'chad'   ? 'border-chad-500/30 hover:border-chad-500'   : 'border-indigo-500/30 hover:border-indigo-500'
@@ -129,6 +142,12 @@ function ProfileCard({ user, accent, streak, onLogin }) {
           )}
         </div>
         <p className="text-slate-400 text-sm mt-0.5">{user.email}</p>
+        {weeklyScore && weeklyScore.chad > weeklyScore.paff && (
+          <p className="text-amber-400 text-xs font-semibold mt-1">🗿 chad de la semaine</p>
+        )}
+        {weeklyScore && weeklyScore.paff > weeklyScore.chad && (
+          <p className="text-red-400 text-xs font-semibold mt-1">🤡 paff de la semaine</p>
+        )}
       </div>
 
       {/* Flèche */}
