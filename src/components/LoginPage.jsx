@@ -102,6 +102,7 @@ export default function LoginPage({ onLogin }) {
 
 function ProfileCard({ user, accent, streak, weeklyScore, onLogin }) {
   const [pressing, setPressing] = useState(false)
+  const [imgError, setImgError] = useState(false)
 
   const border  = accent === 'chad'   ? 'border-chad-500/30 hover:border-chad-500'   : 'border-indigo-500/30 hover:border-indigo-500'
   const glow    = accent === 'chad'   ? 'hover:shadow-chad-500/20'                   : 'hover:shadow-indigo-500/20'
@@ -126,12 +127,19 @@ function ProfileCard({ user, accent, streak, weeklyScore, onLogin }) {
     >
       {/* Avatar */}
       <div className={`relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden ring-2 ${ring} ring-offset-2 ring-offset-slate-900`}>
-        <img
-          src={user.name === 'Alex' ? '/avatars/alex.png' : '/avatars/aurel.png'}
-          alt={user.name}
-          className="w-full h-full object-cover"
-        />
-        </div>
+        {imgError ? (
+          <div className="w-full h-full flex items-center justify-center bg-slate-800 text-white font-bold text-2xl">
+            {user.name[0].toUpperCase()}
+          </div>
+        ) : (
+          <img
+            src={user.avatar_url || `/avatars/${user.name.toLowerCase()}.png`}
+            alt={user.name}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        )}
+      </div>
 
       {/* Infos */}
       <div className="flex-1 text-left">
