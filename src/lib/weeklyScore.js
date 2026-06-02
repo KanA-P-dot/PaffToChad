@@ -51,15 +51,22 @@ export async function fetchWeeklyScores() {
       return { id: r.id, pct: total > 0 ? done / total : 0, total }
     })
 
-    if (dayScores.length === 2) {
-      const [a, b] = dayScores
-      // On ne compte que si au moins un user a des objectifs
-      if (a.total > 0 || b.total > 0) {
-        if (a.pct > b.pct)      { scores[a.id].chad++; scores[b.id].paff++ }
-        else if (b.pct > a.pct) { scores[b.id].chad++; scores[a.id].paff++ }
-        // égalité → personne ne gagne de badge
-      }
-    }
+    // On ne joue que si au moins un user a des objectifs ce jour
+    if (!dayScores.some(s => s.total > 0)) continue
+
+    const maxPct = Math.max(...dayScores.map(s => s.pct))
+    const minPct = Math.min(...dayScores.map(s => s.pct))
+
+    // Égalité générale → personne ne gagne
+    if (maxPct === minPct) continue
+
+    const winners = dayScores.filter(s => s.pct === maxPct)
+    const losers  = dayScores.filter(s => s.pct === minPct)
+
+    // Un seul meilleur du jour → chad
+    if (winners.length === 1) scores[winners[0].id].chad++
+    // Un seul moins bon du jour → paff
+    if (losers.length === 1)  scores[losers[0].id].paff++
   }
 
   return { scores, users }

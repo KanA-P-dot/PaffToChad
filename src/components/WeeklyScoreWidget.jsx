@@ -28,9 +28,10 @@ export default function WeeklyScoreWidget({ currentUserId }) {
   const userList = users.map(u => ({ ...u, ...scores[u.id] }))
 
   // Gagnants de la semaine
+  const maxChad    = Math.max(...userList.map(u => u.chad))
   const chadWinner = [...userList].sort((a, b) => b.chad - a.chad)[0]
   const paffWinner = [...userList].sort((a, b) => b.paff - a.paff)[0]
-  const isTie      = userList[0].chad === userList[1].chad
+  const isTie      = userList.filter(u => u.chad === maxChad).length > 1
   const bothZero   = userList.every(u => u.chad === 0 && u.paff === 0)
 
   /* ─── DIMANCHE 20H : Révélation ──────────────────────────────────────── */
@@ -57,7 +58,7 @@ export default function WeeklyScoreWidget({ currentUserId }) {
               <p className="text-4xl mb-3">🤝</p>
               <p className="text-white font-bold text-lg">Égalité parfaite !</p>
               <p className="text-slate-400 text-sm mt-1">
-                {userList[0].chad} victoire{userList[0].chad > 1 ? 's' : ''} chacun
+                {maxChad} victoire{maxChad > 1 ? 's' : ''} chacun
               </p>
             </div>
           ) : (
@@ -108,7 +109,7 @@ export default function WeeklyScoreWidget({ currentUserId }) {
         )}
       </div>
 
-      <div className="p-3 grid grid-cols-2 gap-2">
+      <div className={`p-3 grid gap-2 ${userList.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {userList.map(u => {
           const isMe = u.id === currentUserId
           return (
