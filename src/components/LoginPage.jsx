@@ -3,21 +3,23 @@ import { supabase } from '../lib/supabase'
 import { fetchStreak } from '../lib/streak'
 import { fetchWeeklyScores } from '../lib/weeklyScore'
 import WeeklyScoreWidget from './WeeklyScoreWidget'
+import AccountEditor from './AccountEditor'
 
 export default function LoginPage({ onLogin }) {
   const [users, setUsers]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
-  const [streaks, setStreaks]        = useState({}) // { userId: count }
-  const [weeklyScores, setWeeklyScores] = useState({}) // { userId: { chad, paff } }
+  const [streaks, setStreaks]        = useState({})
+  const [weeklyScores, setWeeklyScores] = useState({})
+  const [editing, setEditing]       = useState(null) // null | 'new' | userObject
 
-  useEffect(() => {
+  function loadUsers() {
+    setLoading(true)
     supabase
       .from('users')
       .select('*')
       .order('name')
       .then(({ data, error }) => {
-        console.log('[PTC] data:', data, 'error:', error)
         if (error) setError(error.message || JSON.stringify(error))
         else {
           setUsers(data ?? [])
@@ -31,11 +33,30 @@ export default function LoginPage({ onLogin }) {
         setLoading(false)
       })
       .catch(err => {
-        console.error('[PTC] fetch crash:', err)
         setError('Crash: ' + err.message)
         setLoading(false)
       })
-  }, [])
+  }
+
+  useEffect(() => { loadUsers() }, [])
+
+  async function deleteUser(user) {
+    if (!confirm(`Supprimer le compte "${user.name}" ?\nCette action est irréversible (objectifs et historique supprimés).`)) return
+    const { error } = await supabase.from('users').delete().eq('id', user.id)
+    if (error) { alert('Erreur : ' + error.message); return }
+    setUsers(prev => prev.filter(u => u.id !== user.id))
+  }
+
+  // Vue AccountEditor (création ou édition)
+  if (editing !== null) {
+    return (
+      <AccountEditor
+        user={editing === 'new' ? null : editing}
+        onBack={() => setEditing(null)}
+        onSaved={() => { setEditing(null); loadUsers() }}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-6 py-12">
@@ -83,8 +104,21 @@ export default function LoginPage({ onLogin }) {
               streak={streaks[user.id] ?? null}
               weeklyScore={weeklyScores[user.id] ?? null}
               onLogin={onLogin}
+              onEdit={() => setEditing(user)}
+              onDelete={() => deleteUser(user)}
             />
           ))}
+
+          {/* Bouton nouveau compte */}
+          <button
+            onClick={() => setEditing('new')}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-colors text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Nouveau compte
+          </button>
         </div>
       )}
 
@@ -100,7 +134,7 @@ export default function LoginPage({ onLogin }) {
   )
 }
 
-function ProfileCard({ user, accent, streak, weeklyScore, onLogin }) {
+function ProfileCard({ user, accent, streak, weeklyScore, onLogin, onEdit, onDelete }) {
   const [pressing, setPressing] = useState(false)
   const [imgError, setImgError] = useState(false)
 
@@ -125,6 +159,30 @@ function ProfileCard({ user, accent, streak, weeklyScore, onLogin }) {
         focus:outline-none focus:ring-2 ${ring} focus:ring-offset-2 focus:ring-offset-slate-950
       `}
     >
+      {/* Boutons edit / delete */}
+      <div className="absolute top-2 right-2 flex gap-1" onClick={e => e.stopPropagation()}>
+        <button
+          onClick={onEdit}
+          className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors"
+          aria-label="Modifier"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a4 4 0 01-2.828 1.172H7v-2a4 4 0 011.172-2.828z" />
+          </svg>
+        </button>
+        <button
+          onClick={onDelete}
+          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-700 transition-colors"
+          aria-label="Supprimer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a1 1 0 011-1h4a1 1 0 011 1m-7 0h8" />
+          </svg>
+        </button>
+      </div>
+
       {/* Avatar */}
       <div className={`relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden ring-2 ${ring} ring-offset-2 ring-offset-slate-900`}>
         {imgError ? (
