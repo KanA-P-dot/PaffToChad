@@ -115,7 +115,7 @@ export default function ObjectifsEditor({ user, onBack, onObjectifsChange }) {
     <div className="min-h-screen bg-slate-950 flex flex-col">
 
       {/* ── HEADER ──────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/60 px-5 py-4">
+      <header className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/60 px-5 pb-4 pt-safe">
         <div className="flex items-center gap-3 max-w-md mx-auto">
           <button
             onClick={onBack}

@@ -30,6 +30,11 @@
 }
 
 @layer utilities {
+  /* Safe area pour PWA iOS (status bar black-translucent) */
+  .pt-safe {
+    padding-top: calc(env(safe-area-inset-top) + 1rem);
+  }
+
   /* Animation d'entrée douce */
   .animate-in {
     animation-fill-mode: both;
