@@ -32,10 +32,11 @@ export default function StatsModule({ user, onBack }) {
       const days = eachDayOfInterval({ start, end })
       const nbDays = days.length
 
-      // Récupérer tous les objectifs
+      // Récupérer les objectifs de l'utilisateur
       const { data: objectifs } = await supabase
         .from('objectifs')
         .select('*')
+        .eq('user_id', user.id)
         .order('order_index')
 
       // Récupérer les logs sur la période pour cet utilisateur
