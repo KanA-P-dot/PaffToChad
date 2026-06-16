@@ -20,6 +20,15 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif']
+      },
+      keyframes: {
+        slideUp: {
+          from: { transform: 'translateY(28px)', opacity: '0' },
+          to:   { transform: 'translateY(0)',    opacity: '1' },
+        },
+      },
+      animation: {
+        'slide-up': 'slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
       }
     }
   },

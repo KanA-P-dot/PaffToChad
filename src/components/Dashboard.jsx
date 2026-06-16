@@ -3,22 +3,34 @@ import { format, subDays, addDays, isToday } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { supabase } from '../lib/supabase'
 import { fetchStreak } from '../lib/streak'
+import { fetchObjectifStreaks } from '../lib/objectifStreak'
 import StatsModule from './StatsModule'
 import ObjectifsEditor from './ObjectifsEditor'
+import Confetti from './Confetti'
+import PatchNoteModal, { PATCH_NOTE_KEY } from './PatchNoteModal'
 
-// ─── Utilitaire : formater une Date en YYYY-MM-DD ─────────────────────────────
 const toISO = (d) => format(d, 'yyyy-MM-dd')
 
 export default function Dashboard({ user, onLogout }) {
-  const [view, setView]           = useState('dashboard') // 'dashboard' | 'stats' | 'objectifs'
+  const [view, setView]           = useState('dashboard')
   const [currentDate, setCurrent] = useState(new Date())
   const [objectifs, setObjectifs] = useState([])
-  const [logs, setLogs]           = useState({})        // { objectif_id: boolean }
-  const [saving, setSaving]       = useState({})        // { objectif_id: true } en cours de save
+  const [logs, setLogs]           = useState({})
+  const [saving, setSaving]       = useState({})
   const [loadingLogs, setLoadingLogs] = useState(false)
   const [streak, setStreak]       = useState(null)
+  const [objectifStreaks, setObjectifStreaks] = useState({})
+  const [rival, setRival]         = useState(null)
+  const [confettiKey, setConfettiKey] = useState(0)
+  const [showPatchNote, setShowPatchNote] = useState(
+    () => !localStorage.getItem(PATCH_NOTE_KEY)
+  )
 
-  // Charge les objectifs (rappelable après édition)
+  const closePatchNote = () => {
+    localStorage.setItem(PATCH_NOTE_KEY, '1')
+    setShowPatchNote(false)
+  }
+
   const loadObjectifs = useCallback(async () => {
     const { data } = await supabase
       .from('objectifs')
@@ -30,7 +42,6 @@ export default function Dashboard({ user, onLogout }) {
 
   useEffect(() => { loadObjectifs() }, [loadObjectifs])
 
-  // Charge les logs dès que la date ou l'user change
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true)
     const { data } = await supabase
@@ -47,19 +58,70 @@ export default function Dashboard({ user, onLogout }) {
 
   useEffect(() => { loadLogs() }, [loadLogs])
 
-  // Charge / rafraîchit le streak (recalcul si les logs d'aujourd'hui changent)
   const completedCount = objectifs.filter(o => logs[o.id]).length
   const totalCount     = objectifs.length
+
+  // Streak global
   useEffect(() => {
     fetchStreak(user.id).then(setStreak)
   }, [user.id, isToday(currentDate) ? completedCount : null])  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Streaks par objectif individuel
+  const loadObjectifStreaks = useCallback(() => {
+    fetchObjectifStreaks(user.id).then(setObjectifStreaks)
+  }, [user.id])
+
+  useEffect(() => { loadObjectifStreaks() }, [loadObjectifStreaks])
+
+  // Progression de l'adversaire (live, seulement aujourd'hui)
+  const loadRivalProgress = useCallback(async () => {
+    if (!isToday(currentDate)) { setRival(null); return }
+
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, avatar_url')
+    if (!users) return
+
+    const rivalUser = users.find(u => u.id !== user.id)
+    if (!rivalUser) return
+
+    const [{ data: rivalObjs }, { data: rivalLogs }] = await Promise.all([
+      supabase.from('objectifs').select('id').eq('user_id', rivalUser.id),
+      supabase.from('logs').select('objectif_id, completed')
+        .eq('user_id', rivalUser.id)
+        .eq('date', toISO(currentDate)),
+    ])
+
+    const total     = rivalObjs?.length ?? 0
+    const completed = rivalLogs?.filter(l => l.completed).length ?? 0
+    setRival({ user: rivalUser, completed, total })
+  }, [user.id, currentDate])
+
+  useEffect(() => { loadRivalProgress() }, [loadRivalProgress])
+
+  // Rafraîchissement automatique du rival toutes les 30s quand on est sur aujourd'hui
+  useEffect(() => {
+    if (!isToday(currentDate)) return
+    const id = setInterval(loadRivalProgress, 30_000)
+    return () => clearInterval(id)
+  }, [currentDate, loadRivalProgress])
+
   // Toggle un objectif (upsert Supabase)
   const toggle = async (objectif_id) => {
-    const newVal = !logs[objectif_id]
+    const newVal  = !logs[objectif_id]
+    const newLogs = { ...logs, [objectif_id]: newVal }
+
     // Optimistic UI
-    setLogs(prev => ({ ...prev, [objectif_id]: newVal }))
+    setLogs(newLogs)
     setSaving(prev => ({ ...prev, [objectif_id]: true }))
+
+    // Déclenche les confettis si le dernier objectif vient d'être coché
+    if (newVal && isToday(currentDate)) {
+      const newCompleted = objectifs.filter(o => newLogs[o.id]).length
+      if (newCompleted === objectifs.length && objectifs.length > 0) {
+        setConfettiKey(k => k + 1)
+      }
+    }
 
     const { error } = await supabase
       .from('logs')
@@ -69,9 +131,10 @@ export default function Dashboard({ user, onLogout }) {
       )
 
     if (error) {
-      // rollback si erreur
       setLogs(prev => ({ ...prev, [objectif_id]: !newVal }))
       console.error('Supabase upsert error:', error.message)
+    } else if (isToday(currentDate)) {
+      loadObjectifStreaks()
     }
     setSaving(prev => ({ ...prev, [objectif_id]: false }))
   }
@@ -98,11 +161,12 @@ export default function Dashboard({ user, onLogout }) {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
+      <Confetti trigger={confettiKey} />
+      {showPatchNote && <PatchNoteModal onClose={closePatchNote} />}
 
       {/* ── HEADER ─────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/60 px-5 pb-4 pt-safe">
         <div className="flex items-center justify-between max-w-md mx-auto">
-          {/* Logo */}
           <button
             onClick={onLogout}
             className="text-xl font-black text-white tracking-tight hover:opacity-70 transition-opacity"
@@ -110,7 +174,6 @@ export default function Dashboard({ user, onLogout }) {
             Paff<span className="text-chad-500">To</span>Chad
           </button>
 
-          {/* Actions */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setView('stats')}
@@ -199,7 +262,7 @@ export default function Dashboard({ user, onLogout }) {
         </div>
 
         {/* Barre de progression globale */}
-        <div className="mb-6">
+        <div className="mb-5">
           <div className="flex justify-between items-center mb-1.5">
             <span className="text-slate-400 text-xs font-medium">Progression du jour</span>
             <span className={`text-xs font-bold ${progress === 100 ? 'text-green-400' : 'text-white'}`}>
@@ -219,6 +282,11 @@ export default function Dashboard({ user, onLogout }) {
             />
           </div>
         </div>
+
+        {/* Widget adversaire en live */}
+        {rival && isToday(currentDate) && (
+          <RivalWidget rival={rival} myProgress={progress} />
+        )}
 
         {/* Message de félicitations */}
         {progress === 100 && (
@@ -241,6 +309,7 @@ export default function Dashboard({ user, onLogout }) {
                   completed={!!logs[obj.id]}
                   isSaving={!!saving[obj.id]}
                   isFirst={i === 0}
+                  streak={objectifStreaks[obj.id] || 0}
                   onToggle={() => toggle(obj.id)}
                 />
               ))
@@ -251,8 +320,45 @@ export default function Dashboard({ user, onLogout }) {
   )
 }
 
+// ─── Widget adversaire en live ────────────────────────────────────────────────
+function RivalWidget({ rival, myProgress }) {
+  const { user: rivalUser, completed, total } = rival
+  const pct     = total > 0 ? Math.round((completed / total) * 100) : 0
+  const isAhead = pct > myProgress
+  const isTied  = pct === myProgress
+
+  return (
+    <div className="mb-5 p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/40">
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          <span className="text-base">⚔️</span>
+          <span className="text-indigo-300 text-sm font-semibold">{rivalUser.name} en ce moment</span>
+        </div>
+        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+          isAhead ? 'bg-red-500/20 text-red-400' :
+          isTied  ? 'bg-amber-500/20 text-amber-400' :
+                   'bg-green-500/20 text-green-400'
+        }`}>
+          {isAhead ? '🤡 Tu es derrière' : isTied ? '⚖️ Égalité' : '🗿 Tu mènes'}
+        </span>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+            style={{ width: total > 0 ? `${pct}%` : '0%' }}
+          />
+        </div>
+        <span className="text-indigo-300 text-xs font-bold shrink-0">
+          {completed}/{total}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Carte d'un objectif ──────────────────────────────────────────────────────
-function ObjectifCard({ objectif, completed, isSaving, isFirst, onToggle }) {
+function ObjectifCard({ objectif, completed, isSaving, isFirst, streak, onToggle }) {
   return (
     <button
       onClick={onToggle}
@@ -299,9 +405,14 @@ function ObjectifCard({ objectif, completed, isSaving, isFirst, onToggle }) {
 
       {/* Texte */}
       <div className="flex-1 min-w-0 pr-6">
-        <p className={`font-semibold text-base leading-snug ${completed ? 'text-green-300' : 'text-white'}`}>
-          {objectif.title}
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className={`font-semibold text-base leading-snug ${completed ? 'text-green-300' : 'text-white'}`}>
+            {objectif.title}
+          </p>
+          {streak > 0 && (
+            <span className="text-[11px] font-bold text-orange-400 shrink-0">🔥 {streak}j</span>
+          )}
+        </div>
         {objectif.description && (
           <p className={`text-xs mt-0.5 ${completed ? 'text-green-600' : 'text-slate-500'}`}>
             {objectif.description}
