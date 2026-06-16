@@ -5,7 +5,7 @@ const FEATURES = [
   {
     icon: '⚔️',
     title: 'Adversaire en live',
-    desc: 'La progression de ton rival s'affiche en temps réel sous ta barre du jour. Tu sais toujours si tu mènes ou si tu dois accélérer.',
+    desc: "La progression de ton rival s'affiche en temps réel sous ta barre du jour. Tu sais toujours si tu mènes ou si tu dois accélérer.",
     color: 'text-indigo-400',
     bg: 'bg-indigo-950/50 border-indigo-800/40',
   },
